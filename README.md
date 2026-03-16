@@ -181,28 +181,29 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 
 **`docker-compose.yml`:**
 ```yaml
-version: '3.8'
-
 services:
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: sqlserver
-    environment:
-      SA_PASSWORD: ${DB_PASS}
-      ACCEPT_EULA: "Y"
     ports:
       - "1433:1433"
-    volumes:
-      - sqlserver_data:/var/opt/mssql
+    environment:
+      ACCEPT_EULA: "Y"
+      SA_PASSWORD: "${DB_PASS}"
+    networks:
+      - app-network
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P ${DB_PASS} -Q 'SELECT 1'"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P ${DB_PASS} -Q 'SELECT 1' -No"]
+      interval: 15s
+      timeout: 10s
       retries: 10
+      start_period: 30s
 
-  content-sanitizer:
+  sanitizer-api:
     build: .
-    container_name: content-sanitizer
+    container_name: sanitizer-api
+    ports:
+      - "8080:8080"
     env_file:
       - .env
     environment:
@@ -210,15 +211,17 @@ services:
       DB_PORT: 1433
       DB_NAME: sensitivewords
       DB_USER: sa
-      DB_PASS: ${DB_PASS}
+      DB_PASS: "${DB_PASS}"
     depends_on:
       sqlserver:
         condition: service_healthy
-    ports:
-      - "8080:8080"
+    networks:
+      - app-network
+    restart: on-failure
 
-volumes:
-  sqlserver_data:
+networks:
+  app-network:
+    driver: bridge
 ```
 
 > **Note:** The `healthcheck` uses the actual `sqlcmd` tool rather than `curl`, which is not available in the SQL Server image. The `depends_on` condition is upgraded to `service_healthy` so the app waits for SQL Server to be fully ready before starting.
@@ -235,37 +238,30 @@ The following checklist outlines production-grade improvements beyond the base i
 - [x] **Compiled regex patterns** — `Pattern` objects are pre-compiled at load time, not per request.
 - [x] **Live cache refresh endpoint** — `POST /api/internal/sensitive-words/cache/refresh` reloads patterns without a service restart.
 - [x] **Resilient refresh** — If the DB call fails during refresh, the existing cache is retained rather than replaced with an empty list.
-- [] **Distributed cache (Redis)** — Replace the local `AtomicReference` cache with a Redis-backed store so that all horizontal replicas share one consistent word list. Add `spring-boot-starter-data-redis` and annotate with `@Cacheable` / `@CacheEvict`.
-- [] **Scheduled auto-refresh** — Add `@Scheduled(fixedRateString = "${sanitizer.cache.refresh-interval:300000}")` to `refreshCache()` to periodically sync the cache with the DB without manual intervention.
+- [ ] **Distributed cache (Redis)** — Replace the local `AtomicReference` cache with a Redis-backed store so that all horizontal replicas share one consistent word list.
 
 ### Sanitization Performance
 
 - [x] **Single-pass string replacement** — Each pattern iterates through the message once; no redundant scanning.
-- [] **Aho-Corasick multi-pattern matching** — For large word lists (1 000+), replace sequential `Pattern` iteration with an [Aho-Corasick](https://github.com/robert-bor/aho-corasick) automaton. This reduces time complexity from O(n × m) to O(n + m + z), where z is the number of matches.
-- [] **Parallel sanitization** — For very long messages, split into chunks and apply patterns in parallel using `ForkJoinPool` or a structured `CompletableFuture` pipeline.
-- [] **Lookahead/lookbehind boundary matching** — The current implementation uses `\b` word boundaries
+- [ ] **Aho-Corasick multi-pattern matching** — For large word lists (1 000+), replace sequential `Pattern` iteration with an [Aho-Corasick](https://github.com/robert-bor/aho-corasick) automaton. This reduces time complexity from O(n × m) to O(n + m + z), where z is the number of matches.
+- [ ] **Parallel sanitization** — For very long messages, split into chunks and apply patterns in parallel using `ForkJoinPool` or a structured `CompletableFuture` pipeline.
+- [ ] **Lookahead/lookbehind boundary matching** — The current implementation uses `\b` word boundaries
     which break down for sensitive words ending in non-word characters (e.g. `c++`, `f#`, `100%`).
     These words are protected from `PatternSyntaxException` via `Pattern.quote()` but will not be
     masked in practice.
 
 ### Database & Persistence
 
-- [] **Indexed `word` column** — Ensure a unique, case-insensitive index on the `word` column (`CREATE UNIQUE INDEX ... ON sensitive_words (LOWER(word))`), so duplicate checks are handled at the DB level, not just application level.
-- [] **Bulk word import endpoint** — Add `POST /api/internal/sensitive-words/bulk` accepting a JSON array of words, processed in a single transaction with `saveAll()`, to avoid N+1 insert overhead.
-- [] **Soft deletes** — Add an `active` boolean flag instead of hard-deleting rows, allowing audit history and easier rollback via an `/api/internal/sensitive-words/{word}/restore` endpoint.
-- [] **Optimistic locking** — Add `@Version` to the `SensitiveWord` entity to guard against concurrent update conflicts.
+- [x] **Indexed `word` column** — Ensure a unique, case-insensitive index on the `word` column (`CREATE UNIQUE INDEX ... ON sensitive_words (LOWER(word))`), so duplicate checks are handled at the DB level, not just application level.
+- [ ] **Bulk word import endpoint** — Add `POST /api/internal/sensitive-words/bulk` accepting a JSON array of words, processed in a single transaction with `saveAll()`, to avoid N+1 insert overhead.
+- [ ] **Soft deletes** — Add an `active` boolean flag instead of hard-deleting rows, allowing audit history and easier rollback via an `/api/internal/sensitive-words/{word}/restore` endpoint.
 
 ### API & Observability
-
-- [] **Pagination on `GET /api/words`** — Return a `Page<WordDTO>` using `Pageable` to avoid loading the full word list into the HTTP response for large datasets.
-- [] **Rate limiting** — Apply `Bucket4j` or Spring Cloud Gateway rate limiting on `/api/sanitize` to prevent abuse and protect throughput SLAs.
-- [] **Actuator + Micrometer metrics** — Expose `sanitize.requests.count`, `sanitize.duration`, and `cache.size` as Micrometer gauges/counters, scraped by Prometheus and visualised in Grafana.
-- [] **Structured logging** — Replace plain log strings with structured JSON logs (Logstash encoder) so log aggregators (ELK, Loki) can filter by `wordCount`, `messageLength`, and `cacheMiss` fields.
-- [] **Correlation IDs** — Propagate an `X-Request-ID` header through MDC so all log lines for a single request are traceable end-to-end.
+- [ ] **Rate limiting** — Apply `Bucket4j` or Spring Cloud Gateway rate limiting on `/api/sanitize` to prevent abuse and protect throughput SLAs.
+- [ ] **Actuator + Micrometer metrics** — Expose `sanitize.requests.count`, `sanitize.duration`, and `cache.size` as Micrometer gauges/counters, scraped by Prometheus and visualised in Grafana.
 
 ### Resilience & Security
 
-- [] **Input length guard** — Reject messages exceeding a configurable maximum length (e.g. 10 000 characters) at the DTO validation layer to prevent regex catastrophic backtracking on adversarial input.
-- [] **ReDoS protection** — Audit all compiled patterns; ensure `Pattern.quote()` is always used for user-supplied words (already done) and add a CI lint step to catch unsafe patterns introduced in future.
-- [] **API key / JWT authentication** — Secure the management endpoints (`/api/internal/sensitive-words/**`) behind Spring Security with role-based access (`ROLE_ADMIN`), leaving `/api/sanitize` optionally open for service-to-service calls.
-- [] **Integration test coverage** — Add `@SpringBootTest` + Testcontainers (SQL Server image) tests for the full sanitize-and-refresh cycle, ensuring cache consistency is validated against a real database.
+- [ ] **Input length guard** — Reject messages exceeding a configurable maximum length (e.g. 10 000 characters) at the DTO validation layer to prevent regex catastrophic backtracking on adversarial input.
+- [ ] **API key / JWT authentication** — Secure the management endpoints (`/api/internal/sensitive-words/**`) behind Spring Security with role-based access (`ROLE_ADMIN`), leaving `/api/sanitize` optionally open for service-to-service calls.
+- [ ] **Integration test coverage** — Add `@SpringBootTest` + Testcontainers (SQL Server image) tests for the full sanitize-and-refresh cycle, ensuring cache consistency is validated against a real database.
