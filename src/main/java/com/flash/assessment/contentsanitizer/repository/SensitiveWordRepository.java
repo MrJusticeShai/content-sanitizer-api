@@ -22,12 +22,15 @@ import java.util.Optional;
 public interface SensitiveWordRepository extends JpaRepository<SensitiveWord, Long> {
 
     /**
-     * Retrieves a {@link SensitiveWord} by its word value.
+     * Finds a sensitive word by its value, case-insensitive.
      *
      * @param word the word to search for
-     * @return an {@link Optional} containing the matching {@link SensitiveWord}
-     *         if found, otherwise empty
+     * @return an Optional containing the entity if found
      */
-    Optional<SensitiveWord> findByWord(String word);
+    Optional<SensitiveWord> findByWordIgnoreCase(String word);
+
+    boolean existsByWordIgnoreCase(String word);
+
+    void deleteByWordIgnoreCase(String word);
 
 }

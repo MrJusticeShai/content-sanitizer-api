@@ -23,10 +23,6 @@ import lombok.Data;
 @Schema(description = "Request payload containing the message to be sanitized")
 public class SantizeRequest {
 
-    /**
-     * The message to be sanitized.
-     * Must not be blank.
-     */
     @NotBlank
     @Schema(description = "The message that needs sanitization", required = true, example = "My password is 12345")
     private String message;

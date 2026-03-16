@@ -1,6 +1,7 @@
 package com.flash.assessment.contentsanitizer.service.word;
 
 import com.flash.assessment.contentsanitizer.dto.CreateSensitiveWordRequest;
+import com.flash.assessment.contentsanitizer.dto.UpdateSensitiveWordRequest;
 import com.flash.assessment.contentsanitizer.entity.SensitiveWord;
 
 import java.util.List;
@@ -21,7 +22,7 @@ public interface SensitiveWordService {
      * @param request the DTO containing the word to create
      * @return the created {@link SensitiveWord} entity
      */
-    SensitiveWord createWord(CreateSensitiveWordRequest request);
+    SensitiveWord createWord(CreateSensitiveWordRequest createRequest);
 
     /**
      * Retrieves all sensitive words currently stored in the system.
@@ -33,17 +34,16 @@ public interface SensitiveWordService {
     /**
      * Updates the word of an existing sensitive word entity.
      *
-     * @param id   the ID of the sensitive word to update
-     * @param word the new word value
+     * @param updateRequest  the DTO containing the word to update
      * @return the updated {@link SensitiveWord} entity
      */
-    SensitiveWord updateWord(Long id, String word);
+    SensitiveWord updateWord(UpdateSensitiveWordRequest updateRequest);
 
     /**
      * Deletes a sensitive word from the system.
      *
      * @param id the ID of the sensitive word to delete
      */
-    void deleteWord(Long id);
+    void deleteWordByWord(String word);
 
 }

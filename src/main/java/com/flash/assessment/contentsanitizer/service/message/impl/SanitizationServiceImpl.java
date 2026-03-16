@@ -3,6 +3,7 @@ package com.flash.assessment.contentsanitizer.service.message.impl;
 import com.flash.assessment.contentsanitizer.entity.SensitiveWord;
 import com.flash.assessment.contentsanitizer.service.message.SanitizationService;
 import com.flash.assessment.contentsanitizer.service.word.SensitiveWordService;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -31,22 +32,25 @@ import java.util.List;
 public class SanitizationServiceImpl implements SanitizationService {
 
     private final SensitiveWordService wordService;
+    private volatile List<SensitiveWord> cachedWords;
+
+    @PostConstruct
+    public void init() {
+        refreshCache();
+    }
+
+    public void refreshCache() {
+        cachedWords = wordService.getAllWords();
+    }
 
     @Override
     public String sanitizeMessage(String message) {
-        if (message == null || message.isEmpty()) {
-            return message;
-        }
-
-        List<SensitiveWord> words = wordService.getAllWords();
+        if (message == null || message.isEmpty()) return message;
         String sanitized = message;
-
-        for (SensitiveWord word : words) {
-            // Replace sensitive words with asterisks
+        for (SensitiveWord word : cachedWords) {
             sanitized = sanitized.replaceAll("(?i)\\b" + word.getWord() + "\\b",
                     "*".repeat(word.getWord().length()));
         }
-
         return sanitized;
     }
 }

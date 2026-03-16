@@ -1,6 +1,7 @@
 package com.flash.assessment.contentsanitizer.service.word.impl;
 
 import com.flash.assessment.contentsanitizer.dto.CreateSensitiveWordRequest;
+import com.flash.assessment.contentsanitizer.dto.UpdateSensitiveWordRequest;
 import com.flash.assessment.contentsanitizer.entity.SensitiveWord;
 import com.flash.assessment.contentsanitizer.repository.SensitiveWordRepository;
 import com.flash.assessment.contentsanitizer.service.word.SensitiveWordService;
@@ -16,11 +17,26 @@ public class SensitiveWordServiceImpl implements SensitiveWordService {
     private final SensitiveWordRepository repository;
 
     @Override
-    public SensitiveWord createWord(CreateSensitiveWordRequest request) {
+    public SensitiveWord createWord(CreateSensitiveWordRequest createRequest) {
+        String newWord = createRequest.getWord().trim();
+
+        if (newWord.isBlank()) {
+            throw new IllegalArgumentException("Sensitive word cannot be empty");
+        }
+
+        boolean exists = repository.existsByWordIgnoreCase(newWord);
+        if (exists) {
+            throw new IllegalArgumentException("Sensitive word already exists: " + newWord);
+        }
+
         SensitiveWord word = SensitiveWord.builder()
-                .word(request.getWord().toUpperCase()) // store in uppercase for uniformity
+                .word(newWord.toUpperCase())
                 .build();
-        return repository.save(word);
+
+        SensitiveWord saved = repository.save(word);
+
+        // TODO: Refresh sanitizer cache, later
+        return saved;
     }
 
     @Override
@@ -29,15 +45,37 @@ public class SensitiveWordServiceImpl implements SensitiveWordService {
     }
 
     @Override
-    public SensitiveWord updateWord(Long id, String word) {
-        SensitiveWord existing = repository.findById(id)
+    public SensitiveWord updateWord(UpdateSensitiveWordRequest updateRequest) {
+        String newWord = updateRequest.getWord().trim();
+
+        // Step 1: Find the entity we want to update
+        SensitiveWord existing = repository.findByWordIgnoreCase(newWord)
                 .orElseThrow(() -> new IllegalArgumentException("Word not found"));
-        existing.setWord(word.toUpperCase());
+
+        // Step 2: If the new word is the same as the current word, do nothing
+        if (existing.getWord().equalsIgnoreCase(newWord)) {
+            return existing; // no changes needed
+        }
+
+        // Step 3: Check if the new word already exists elsewhere in the DB
+        boolean duplicate = repository.existsByWordIgnoreCase(newWord);
+        if (duplicate) {
+            throw new IllegalArgumentException("Sensitive word already exists: " + newWord);
+        }
+
+        // Step 4: Update
+        existing.setWord(newWord.toUpperCase());
+
+        // Step 5: Save
         return repository.save(existing);
     }
 
     @Override
-    public void deleteWord(Long id) {
-        repository.deleteById(id);
+    public void deleteWordByWord(String word) {
+        boolean exists = repository.existsByWordIgnoreCase(word);
+        if (!exists) {
+            throw new IllegalArgumentException("Sensitive word not found: " + word);
+        }
+        repository.deleteByWordIgnoreCase(word);
     }
 }
