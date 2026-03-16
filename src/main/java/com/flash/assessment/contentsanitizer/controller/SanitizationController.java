@@ -11,6 +11,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
+import java.util.Map;
+
 /**
  * REST controller for sanitizing messages (external client use).
  * <p>
@@ -38,5 +41,19 @@ public class SanitizationController {
     public ResponseEntity<SanitizeResponse> sanitizeMessage(@Valid @RequestBody SanitizeRequest request) {
         String sanitized = sanitizationService.sanitizeMessage(request.getMessage());
         return ResponseEntity.ok(new SanitizeResponse(sanitized));
+    }
+
+    @PostMapping("cache/refresh")
+    @Operation(
+            summary = "Refresh sanitization cache",
+            description = "Reloads the in-memory sensitive word pattern cache from the database without restarting the service."
+    )
+    @ApiResponse(responseCode = "200", description = "Cache refreshed successfully")
+    public ResponseEntity<Map<String, Object>> refreshCache() {
+        sanitizationService.refreshCache();
+        return ResponseEntity.ok(Map.of(
+                "status", "refreshed",
+                "timestamp", Instant.now().toString()
+        ));
     }
 }

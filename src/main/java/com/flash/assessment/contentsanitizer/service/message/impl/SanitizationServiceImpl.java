@@ -5,9 +5,14 @@ import com.flash.assessment.contentsanitizer.service.message.SanitizationService
 import com.flash.assessment.contentsanitizer.service.word.SensitiveWordService;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Implementation of {@link SanitizationService} that sanitizes messages
@@ -28,28 +33,38 @@ import java.util.List;
  * </p>
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class SanitizationServiceImpl implements SanitizationService {
 
     private final SensitiveWordService wordService;
-    private volatile List<SensitiveWord> cachedWords;
+    private final AtomicReference<List<Pattern>> cachedPatterns = new AtomicReference<>(List.of());
 
     @PostConstruct
-    public void init() {
-        refreshCache();
-    }
-
+    @Override
     public void refreshCache() {
-        cachedWords = wordService.getAllWords();
+        try {
+            List<Pattern> patterns = wordService.getAllWords().stream()
+                    .map(SensitiveWord::getWord)
+                    .filter(StringUtils::hasText)
+                    .map(word -> Pattern.compile("(?i)\\b" + Pattern.quote(word) + "\\b"))
+                    .toList();
+
+            cachedPatterns.set(patterns);
+            log.info("Sanitization cache refreshed — {} pattern(s) loaded.", patterns.size());
+        } catch (Exception e) {
+            log.error("Cache refresh failed — retaining existing {} pattern(s).", cachedPatterns.get().size(), e);
+        }
     }
 
     @Override
     public String sanitizeMessage(String message) {
-        if (message == null || message.isEmpty()) return message;
+        if (!StringUtils.hasText(message)) return message;
+
         String sanitized = message;
-        for (SensitiveWord word : cachedWords) {
-            sanitized = sanitized.replaceAll("(?i)\\b" + word.getWord() + "\\b",
-                    "*".repeat(word.getWord().length()));
+        for (Pattern pattern : cachedPatterns.get()) {
+            sanitized = pattern.matcher(sanitized)
+                    .replaceAll(m -> "*".repeat(m.group().length()));
         }
         return sanitized;
     }
