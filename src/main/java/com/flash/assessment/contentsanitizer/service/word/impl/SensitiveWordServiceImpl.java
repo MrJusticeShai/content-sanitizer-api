@@ -3,6 +3,9 @@ package com.flash.assessment.contentsanitizer.service.word.impl;
 import com.flash.assessment.contentsanitizer.dto.CreateSensitiveWordRequest;
 import com.flash.assessment.contentsanitizer.dto.UpdateSensitiveWordRequest;
 import com.flash.assessment.contentsanitizer.entity.SensitiveWord;
+import com.flash.assessment.contentsanitizer.exception.BadRequestException;
+import com.flash.assessment.contentsanitizer.exception.ConflictException;
+import com.flash.assessment.contentsanitizer.exception.NotFoundException;
 import com.flash.assessment.contentsanitizer.repository.SensitiveWordRepository;
 import com.flash.assessment.contentsanitizer.service.word.SensitiveWordService;
 import lombok.RequiredArgsConstructor;
@@ -21,12 +24,12 @@ public class SensitiveWordServiceImpl implements SensitiveWordService {
         String newWord = createRequest.getWord().trim();
 
         if (newWord.isBlank()) {
-            throw new IllegalArgumentException("Sensitive word cannot be empty");
+            throw new BadRequestException("Sensitive word cannot be empty");
         }
 
         boolean exists = repository.existsByWordIgnoreCase(newWord);
         if (exists) {
-            throw new IllegalArgumentException("Sensitive word already exists: " + newWord);
+            throw new ConflictException("Sensitive word already exists: " + newWord);
         }
 
         SensitiveWord word = SensitiveWord.builder()
@@ -35,7 +38,6 @@ public class SensitiveWordServiceImpl implements SensitiveWordService {
 
         SensitiveWord saved = repository.save(word);
 
-        // TODO: Refresh sanitizer cache, later
         return saved;
     }
 
@@ -50,7 +52,7 @@ public class SensitiveWordServiceImpl implements SensitiveWordService {
 
         // Step 1: Find the entity we want to update
         SensitiveWord existing = repository.findByWordIgnoreCase(newWord)
-                .orElseThrow(() -> new IllegalArgumentException("Word not found"));
+                .orElseThrow(() -> new NotFoundException("Word not found: " + updateRequest.getWord()));
 
         // Step 2: If the new word is the same as the current word, do nothing
         if (existing.getWord().equalsIgnoreCase(newWord)) {
@@ -60,7 +62,7 @@ public class SensitiveWordServiceImpl implements SensitiveWordService {
         // Step 3: Check if the new word already exists elsewhere in the DB
         boolean duplicate = repository.existsByWordIgnoreCase(newWord);
         if (duplicate) {
-            throw new IllegalArgumentException("Sensitive word already exists: " + newWord);
+            throw new ConflictException("Sensitive word already exists: " + newWord);
         }
 
         // Step 4: Update
@@ -74,7 +76,7 @@ public class SensitiveWordServiceImpl implements SensitiveWordService {
     public void deleteWordByWord(String word) {
         boolean exists = repository.existsByWordIgnoreCase(word);
         if (!exists) {
-            throw new IllegalArgumentException("Sensitive word not found: " + word);
+            throw new NotFoundException("Word not found: " + word);
         }
         repository.deleteByWordIgnoreCase(word);
     }
