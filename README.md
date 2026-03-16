@@ -33,7 +33,7 @@ A robust RESTful microservice built as part of a Flash technical assessment. The
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/MrJusticeShai/content-sanitizer-api.git
 cd content-sanitizer
 
 # Build the project
@@ -44,13 +44,22 @@ java -jar target/content-sanitizer-0.0.1-SNAPSHOT.jar
 ```
 
 ### Docker Compose (Recommended)
+
+**1. Create your environment file from the example:**
 ```bash
-# Start the app and database
+cp .env.example .env
+```
+
+Edit `.env` and set a secure password for `DB_PASS`.
+
+**2. Start the containers:**
+```bash
 docker-compose up -d
 ```
 
-> **First run only** — SQL Server does not create the application database automatically.
-> Once the `sqlserver` container is healthy, run:
+**3. First run only — create the database:**
+
+Once the `sqlserver` container is healthy, run:
 ```bash
 docker exec -it sqlserver /opt/mssql-tools18/bin/sqlcmd \
   -S localhost -U sa -P 'your_password' \
@@ -58,18 +67,19 @@ docker exec -it sqlserver /opt/mssql-tools18/bin/sqlcmd \
   -C
 ```
 
-> Then restart the app container so it can connect:
+Replace `your_password` with the value you set in `.env`.
+
+**4. Restart the app so it can connect:**
 ```bash
 docker-compose restart sanitizer-api
 ```
+
+The API is now available at `http://localhost:8080/swagger-ui.html`.
+
+**To stop the containers:**
 ```bash
-# Stop containers
 docker-compose down
 ```
-
-Spins up:
-- `sqlserver` — SQL Server 2022 container with a persistent volume
-- `content-sanitizer` — Spring Boot API container
 ---
 
 ## 💻 API Exploration
