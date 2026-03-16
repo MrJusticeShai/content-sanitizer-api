@@ -4,18 +4,16 @@ import com.flash.assessment.contentsanitizer.dto.CreateSensitiveWordRequest;
 import com.flash.assessment.contentsanitizer.entity.SensitiveWord;
 import com.flash.assessment.contentsanitizer.repository.SensitiveWordRepository;
 import com.flash.assessment.contentsanitizer.service.word.SensitiveWordService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class SensitiveWordServiceImpl implements SensitiveWordService {
 
     private final SensitiveWordRepository repository;
-
-    public SensitiveWordServiceImpl(SensitiveWordRepository repository) {
-        this.repository = repository;
-    }
 
     @Override
     public SensitiveWord createWord(CreateSensitiveWordRequest request) {

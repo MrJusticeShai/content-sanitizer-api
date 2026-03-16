@@ -3,6 +3,7 @@ package com.flash.assessment.contentsanitizer.service.message.impl;
 import com.flash.assessment.contentsanitizer.entity.SensitiveWord;
 import com.flash.assessment.contentsanitizer.service.message.SanitizationService;
 import com.flash.assessment.contentsanitizer.service.word.SensitiveWordService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -26,16 +27,17 @@ import java.util.List;
  * </p>
  */
 @Service
+@RequiredArgsConstructor
 public class SanitizationServiceImpl implements SanitizationService {
 
     private final SensitiveWordService wordService;
 
-    public SanitizationServiceImpl(SensitiveWordService wordService) {
-        this.wordService = wordService;
-    }
-
     @Override
     public String sanitizeMessage(String message) {
+        if (message == null || message.isEmpty()) {
+            return message;
+        }
+
         List<SensitiveWord> words = wordService.getAllWords();
         String sanitized = message;
 
