@@ -44,11 +44,25 @@ java -jar target/content-sanitizer-0.0.1-SNAPSHOT.jar
 ```
 
 ### Docker Compose (Recommended)
-
 ```bash
 # Start the app and database
 docker-compose up -d
+```
 
+> **First run only** — SQL Server does not create the application database automatically.
+> Once the `sqlserver` container is healthy, run:
+```bash
+docker exec -it sqlserver /opt/mssql-tools18/bin/sqlcmd \
+  -S localhost -U sa -P 'your_password' \
+  -Q 'CREATE DATABASE sensitivewords' \
+  -C
+```
+
+> Then restart the app container so it can connect:
+```bash
+docker-compose restart sanitizer-api
+```
+```bash
 # Stop containers
 docker-compose down
 ```
@@ -56,7 +70,6 @@ docker-compose down
 Spins up:
 - `sqlserver` — SQL Server 2022 container with a persistent volume
 - `content-sanitizer` — Spring Boot API container
-
 ---
 
 ## 💻 API Exploration
@@ -159,7 +172,7 @@ DB_PASS=your_secure_password_here
 
 **`Dockerfile`:**
 ```dockerfile
-FROM eclipse-temurin:17-jdk-alpine
+FROM eclipse-temurin:17-jdk-jammy
 WORKDIR /app
 COPY target/content-sanitizer-0.0.1-SNAPSHOT.jar app.jar
 EXPOSE 8080
