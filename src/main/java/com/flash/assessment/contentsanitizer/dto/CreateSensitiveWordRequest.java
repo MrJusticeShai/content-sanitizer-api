@@ -1,5 +1,6 @@
 package com.flash.assessment.contentsanitizer.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
@@ -19,12 +20,10 @@ import lombok.Data;
  * </p>
  */
 @Data
+@Schema(description = "Request payload used to create a sensitive word")
 public class CreateSensitiveWordRequest {
 
-    /**
-     * The sensitive word to be added.
-     * Must not be blank.
-     */
     @NotBlank
+    @Schema(description = "The sensitive word to be added", required = true, example = "password")
     private String word;
 }

@@ -1,5 +1,6 @@
 package com.flash.assessment.contentsanitizer.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
@@ -19,6 +20,7 @@ import lombok.Data;
  * </p>
  */
 @Data
+@Schema(description = "Request payload containing the message to be sanitized")
 public class SantizeRequest {
 
     /**
@@ -26,5 +28,6 @@ public class SantizeRequest {
      * Must not be blank.
      */
     @NotBlank
+    @Schema(description = "The message that needs sanitization", required = true, example = "My password is 12345")
     private String message;
 }

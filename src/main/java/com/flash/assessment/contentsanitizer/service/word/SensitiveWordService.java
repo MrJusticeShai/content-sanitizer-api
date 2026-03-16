@@ -1,0 +1,49 @@
+package com.flash.assessment.contentsanitizer.service.word;
+
+import com.flash.assessment.contentsanitizer.dto.CreateSensitiveWordRequest;
+import com.flash.assessment.contentsanitizer.entity.SensitiveWord;
+
+import java.util.List;
+
+/**
+ * Service interface for managing sensitive words in the system.
+ *
+ * <p>
+ * Provides operations to create, retrieve, update, and delete sensitive words.
+ * Implementations handle the business logic and interaction with persistence layers.
+ * </p>
+ */
+public interface SensitiveWordService {
+
+    /**
+     * Creates a new sensitive word in the system.
+     *
+     * @param request the DTO containing the word to create
+     * @return the created {@link SensitiveWord} entity
+     */
+    SensitiveWord createWord(CreateSensitiveWordRequest request);
+
+    /**
+     * Retrieves all sensitive words currently stored in the system.
+     *
+     * @return a list of all {@link SensitiveWord} entities
+     */
+    List<SensitiveWord> getAllWords();
+
+    /**
+     * Updates the word of an existing sensitive word entity.
+     *
+     * @param id   the ID of the sensitive word to update
+     * @param word the new word value
+     * @return the updated {@link SensitiveWord} entity
+     */
+    SensitiveWord updateWord(Long id, String word);
+
+    /**
+     * Deletes a sensitive word from the system.
+     *
+     * @param id the ID of the sensitive word to delete
+     */
+    void deleteWord(Long id);
+
+}
