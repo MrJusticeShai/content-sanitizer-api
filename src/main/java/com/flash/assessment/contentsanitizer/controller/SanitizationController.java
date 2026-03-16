@@ -42,18 +42,4 @@ public class SanitizationController {
         String sanitized = sanitizationService.sanitizeMessage(request.getMessage());
         return ResponseEntity.ok(new SanitizeResponse(sanitized));
     }
-
-    @PostMapping("cache/refresh")
-    @Operation(
-            summary = "Refresh sanitization cache",
-            description = "Reloads the in-memory sensitive word pattern cache from the database without restarting the service."
-    )
-    @ApiResponse(responseCode = "200", description = "Cache refreshed successfully")
-    public ResponseEntity<Map<String, Object>> refreshCache() {
-        sanitizationService.refreshCache();
-        return ResponseEntity.ok(Map.of(
-                "status", "refreshed",
-                "timestamp", Instant.now().toString()
-        ));
-    }
 }

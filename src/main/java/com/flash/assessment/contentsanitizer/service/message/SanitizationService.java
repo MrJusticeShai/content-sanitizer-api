@@ -19,9 +19,4 @@ public interface SanitizationService {
      */
     String sanitizeMessage(String message);
 
-    /**
-     * Reloads the sensitive word patterns from the database into the in-memory cache.
-     * Safe to call at runtime without restarting the service.
-     */
-    void refreshCache();
 }

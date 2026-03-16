@@ -25,12 +25,28 @@ public interface SensitiveWordRepository extends JpaRepository<SensitiveWord, Lo
      * Finds a sensitive word by its value, case-insensitive.
      *
      * @param word the word to search for
-     * @return an Optional containing the entity if found
+     * @return an {@link Optional} containing the matching {@link SensitiveWord} if found,
+     *         or an empty {@link Optional} if no match exists
      */
     Optional<SensitiveWord> findByWordIgnoreCase(String word);
 
+    /**
+     * Checks whether a sensitive word exists, case-insensitive.
+     *
+     * @param word the word to check
+     * @return {@code true} if a matching word exists, {@code false} otherwise
+     */
     boolean existsByWordIgnoreCase(String word);
 
+    /**
+     * Deletes a sensitive word by its value, case-insensitive.
+     *
+     * <p>
+     * If no matching word is found, this method completes without throwing an exception.
+     * </p>
+     *
+     * @param word the word to delete
+     */
     void deleteByWordIgnoreCase(String word);
 
 }

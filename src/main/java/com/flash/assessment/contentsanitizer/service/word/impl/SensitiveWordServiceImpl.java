@@ -8,16 +8,47 @@ import com.flash.assessment.contentsanitizer.exception.ConflictException;
 import com.flash.assessment.contentsanitizer.exception.NotFoundException;
 import com.flash.assessment.contentsanitizer.repository.SensitiveWordRepository;
 import com.flash.assessment.contentsanitizer.service.word.SensitiveWordService;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
 
 @Service
+@Slf4j
+@Transactional
 @RequiredArgsConstructor
 public class SensitiveWordServiceImpl implements SensitiveWordService {
 
     private final SensitiveWordRepository repository;
+    private final AtomicReference<List<Pattern>> cachedPatterns = new AtomicReference<>(List.of());
+
+    @PostConstruct
+    @Override
+    public void refreshCache() {
+        try {
+            List<Pattern> patterns = getAllWords().stream()
+                    .map(SensitiveWord::getWord)
+                    .filter(StringUtils::hasText)
+                    .map(word -> Pattern.compile("(?i)\\b" + Pattern.quote(word) + "\\b"))
+                    .toList();
+
+            cachedPatterns.set(patterns);
+            log.info("Sanitization cache refreshed — {} pattern(s) loaded.", patterns.size());
+        } catch (Exception e) {
+            log.error("Cache refresh failed — retaining existing {} pattern(s).", cachedPatterns.get().size(), e);
+        }
+    }
+
+    @Override
+    public List<Pattern> getCachedPatterns() {
+        return cachedPatterns.get();
+    }
 
     @Override
     public SensitiveWord createWord(CreateSensitiveWordRequest createRequest) {
@@ -37,10 +68,12 @@ public class SensitiveWordServiceImpl implements SensitiveWordService {
                 .build();
 
         SensitiveWord saved = repository.save(word);
+        refreshCache();
 
         return saved;
     }
 
+    @Transactional(readOnly = true)
     @Override
     public List<SensitiveWord> getAllWords() {
         return repository.findAll();
@@ -66,6 +99,7 @@ public class SensitiveWordServiceImpl implements SensitiveWordService {
         }
 
         existing.setWord(newWord);
+        refreshCache();
         return repository.save(existing);
     }
 
@@ -75,6 +109,8 @@ public class SensitiveWordServiceImpl implements SensitiveWordService {
         if (!exists) {
             throw new NotFoundException("Word not found: " + word);
         }
+
         repository.deleteByWordIgnoreCase(word);
+        refreshCache();
     }
 }

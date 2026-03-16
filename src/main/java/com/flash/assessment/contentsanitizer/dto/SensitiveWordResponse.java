@@ -1,9 +1,7 @@
 package com.flash.assessment.contentsanitizer.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NonNull;
+import lombok.*;
 
 /**
  * Response DTO for sensitive words (internal use).
@@ -16,6 +14,8 @@ import lombok.NonNull;
  */
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Schema(description = "Response payload containing sensitive word information (internal use only)")
 public class SensitiveWordResponse {
 

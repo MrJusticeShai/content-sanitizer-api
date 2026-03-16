@@ -1,18 +1,15 @@
 package com.flash.assessment.contentsanitizer.service.message.impl;
 
-import com.flash.assessment.contentsanitizer.entity.SensitiveWord;
+import com.flash.assessment.contentsanitizer.exception.BadRequestException;
 import com.flash.assessment.contentsanitizer.service.message.SanitizationService;
 import com.flash.assessment.contentsanitizer.service.word.SensitiveWordService;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * Implementation of {@link SanitizationService} that sanitizes messages
@@ -33,36 +30,19 @@ import java.util.stream.Collectors;
  * </p>
  */
 @Service
-@Slf4j
 @RequiredArgsConstructor
 public class SanitizationServiceImpl implements SanitizationService {
 
     private final SensitiveWordService wordService;
-    private final AtomicReference<List<Pattern>> cachedPatterns = new AtomicReference<>(List.of());
-
-    @PostConstruct
-    @Override
-    public void refreshCache() {
-        try {
-            List<Pattern> patterns = wordService.getAllWords().stream()
-                    .map(SensitiveWord::getWord)
-                    .filter(StringUtils::hasText)
-                    .map(word -> Pattern.compile("(?i)\\b" + Pattern.quote(word) + "\\b"))
-                    .toList();
-
-            cachedPatterns.set(patterns);
-            log.info("Sanitization cache refreshed — {} pattern(s) loaded.", patterns.size());
-        } catch (Exception e) {
-            log.error("Cache refresh failed — retaining existing {} pattern(s).", cachedPatterns.get().size(), e);
-        }
-    }
 
     @Override
     public String sanitizeMessage(String message) {
-        if (!StringUtils.hasText(message)) return message;
+        if (!StringUtils.hasText(message)) throw new BadRequestException("Message must not be blank");
+
+        List<Pattern> cachedPatterns = wordService.getCachedPatterns();
 
         String sanitized = message;
-        for (Pattern pattern : cachedPatterns.get()) {
+        for (Pattern pattern : cachedPatterns) {
             sanitized = pattern.matcher(sanitized)
                     .replaceAll(m -> "*".repeat(m.group().length()));
         }

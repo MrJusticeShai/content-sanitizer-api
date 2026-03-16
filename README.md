@@ -86,7 +86,6 @@ Data persists in a named Docker volume — SQL Server is **not** ephemeral like 
 | Endpoint                                      | Method | Purpose | HTTP Statuses |
 |-----------------------------------------------|---|---|---|
 | `/api/internal/sensitive-words`               | `GET` | List all sensitive words | `200` |
-| `/api/words/{word}`                           | `GET` | Retrieve a word by value | `200`, `404` |
 | `/api/internal/sensitive-words`               | `POST` | Add a new sensitive word | `201`, `400`, `409` |
 | `/api/internal/sensitive-words`               | `PUT` | Update an existing word | `200`, `400`, `404`, `409` |
 | `/api/internal/sensitive=words/{word}`        | `DELETE` | Delete a sensitive word | `204`, `404` |
@@ -95,7 +94,7 @@ Data persists in a named Docker volume — SQL Server is **not** ephemeral like 
 
 ### Example Payloads
 
-**Add / Update Word:**
+**Add Sensitive Word:**
 ```json
 { "word": "DROP" }
 ```
@@ -231,6 +230,10 @@ The following checklist outlines production-grade improvements beyond the base i
 - ✅ **Single-pass string replacement** — Each pattern iterates through the message once; no redundant scanning.
 - 🔲 **Aho-Corasick multi-pattern matching** — For large word lists (1 000+), replace sequential `Pattern` iteration with an [Aho-Corasick](https://github.com/robert-bor/aho-corasick) automaton. This reduces time complexity from O(n × m) to O(n + m + z), where z is the number of matches.
 - 🔲 **Parallel sanitization** — For very long messages, split into chunks and apply patterns in parallel using `ForkJoinPool` or a structured `CompletableFuture` pipeline.
+- 🔲 **Lookahead/lookbehind boundary matching** — The current implementation uses `\b` word boundaries
+    which break down for sensitive words ending in non-word characters (e.g. `c++`, `f#`, `100%`).
+    These words are protected from `PatternSyntaxException` via `Pattern.quote()` but will not be
+    masked in practice.
 
 ### Database & Persistence
 

@@ -5,6 +5,7 @@ import com.flash.assessment.contentsanitizer.dto.UpdateSensitiveWordRequest;
 import com.flash.assessment.contentsanitizer.entity.SensitiveWord;
 
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * Service interface for managing sensitive words in the system.
@@ -45,5 +46,13 @@ public interface SensitiveWordService {
      * @param word the ID of the sensitive word to delete
      */
     void deleteWordByWord(String word);
+
+    /**
+     * Reloads the sensitive word patterns from the database into the in-memory cache.
+     * Safe to call at runtime without restarting the service.
+     */
+    void refreshCache();
+
+    public List<Pattern> getCachedPatterns();
 
 }
