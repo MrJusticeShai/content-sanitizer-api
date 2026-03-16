@@ -19,7 +19,7 @@ public interface SensitiveWordService {
     /**
      * Creates a new sensitive word in the system.
      *
-     * @param request the DTO containing the word to create
+     * @param createRequest the DTO containing the word to create
      * @return the created {@link SensitiveWord} entity
      */
     SensitiveWord createWord(CreateSensitiveWordRequest createRequest);
@@ -42,7 +42,7 @@ public interface SensitiveWordService {
     /**
      * Deletes a sensitive word from the system.
      *
-     * @param id the ID of the sensitive word to delete
+     * @param word the ID of the sensitive word to delete
      */
     void deleteWordByWord(String word);
 

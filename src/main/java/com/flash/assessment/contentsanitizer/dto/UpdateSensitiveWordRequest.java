@@ -9,6 +9,10 @@ import lombok.Data;
 public class UpdateSensitiveWordRequest {
 
     @NotBlank
-    @Schema(description = "The new value of the sensitive word", required = true, example = "username")
-    private String word;
+    @Schema(description = "The current word to be updated", required = true, example = "SAVED")
+    private String currentWord;
+
+    @NotBlank
+    @Schema(description = "The new value of the sensitive word", required = true, example = "STORED")
+    private String newWord;
 }

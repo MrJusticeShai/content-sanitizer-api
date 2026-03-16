@@ -21,7 +21,7 @@ import lombok.Data;
  */
 @Data
 @Schema(description = "Request payload containing the message to be sanitized")
-public class SantizeRequest {
+public class SanitizeRequest {
 
     @NotBlank
     @Schema(description = "The message that needs sanitization", required = true, example = "My password is 12345")

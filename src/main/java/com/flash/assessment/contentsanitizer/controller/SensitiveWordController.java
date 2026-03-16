@@ -18,15 +18,18 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * REST controller for managing sensitive words.
+ * Controller for internal CRUD operations on sensitive words.
+ *
  * <p>
- * Provides CRUD endpoints using DTOs to interact with clients.
+ * This controller is intended for internal administration of the sensitive words database.
+ * The real words are exposed here because these endpoints are NOT publicly accessible.
+ * For external clients, only the sanitizeMessage endpoint should be used.
  * </p>
  */
 @RestController
-@RequestMapping("/api/words")
+@RequestMapping("/api/internal/sensitive-words")
 @RequiredArgsConstructor
-@Tag(name = "Sensitive Words", description = "CRUD operations for managing sensitive words")
+@Tag(name = "Sensitive Word Management (Internal)", description = "Internal CRUD operations for sensitive words")
 public class SensitiveWordController {
 
     private final SensitiveWordService wordService;
@@ -65,7 +68,7 @@ public class SensitiveWordController {
     @DeleteMapping("/{word}")
     @Operation(summary = "Delete a sensitive word")
     public ResponseEntity<Void> deleteWord(@PathVariable String word) {
-        wordService.deleteWord(word);
+        wordService.deleteWordByWord(word);
         return ResponseEntity.noContent().build();
     }
 }

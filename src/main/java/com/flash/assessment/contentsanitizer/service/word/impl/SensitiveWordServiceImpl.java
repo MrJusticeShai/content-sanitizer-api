@@ -48,27 +48,24 @@ public class SensitiveWordServiceImpl implements SensitiveWordService {
 
     @Override
     public SensitiveWord updateWord(UpdateSensitiveWordRequest updateRequest) {
-        String newWord = updateRequest.getWord().trim();
+        String currentWord = updateRequest.getCurrentWord().trim();
+        String newWord = updateRequest.getNewWord().trim().toUpperCase();
 
-        // Step 1: Find the entity we want to update
-        SensitiveWord existing = repository.findByWordIgnoreCase(newWord)
-                .orElseThrow(() -> new NotFoundException("Word not found: " + updateRequest.getWord()));
-
-        // Step 2: If the new word is the same as the current word, do nothing
-        if (existing.getWord().equalsIgnoreCase(newWord)) {
-            return existing; // no changes needed
+        if (currentWord.equalsIgnoreCase(newWord)) {
+            throw new BadRequestException("The new word is the same as the current word");
         }
 
-        // Step 3: Check if the new word already exists elsewhere in the DB
-        boolean duplicate = repository.existsByWordIgnoreCase(newWord);
-        if (duplicate) {
+        // Find existing word
+        SensitiveWord existing = repository.findByWordIgnoreCase(currentWord)
+                .orElseThrow(() -> new NotFoundException("Word not found: " + currentWord));
+
+        // Check if the new word already exists
+        boolean exists = repository.existsByWordIgnoreCase(newWord);
+        if (exists) {
             throw new ConflictException("Sensitive word already exists: " + newWord);
         }
 
-        // Step 4: Update
-        existing.setWord(newWord.toUpperCase());
-
-        // Step 5: Save
+        existing.setWord(newWord);
         return repository.save(existing);
     }
 

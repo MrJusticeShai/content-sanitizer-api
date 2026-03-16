@@ -5,10 +5,12 @@ import com.flash.assessment.contentsanitizer.entity.SensitiveWord;
 import org.springframework.stereotype.Component;
 
 /**
- * Mapper for converting SensitiveWord entity to SensitiveWordResponse DTO.
+ * Mapper for converting {@link SensitiveWord} entities to {@link SensitiveWordResponse} DTOs.
  *
  * <p>
- * Masks the word in the response to avoid leaking sensitive content.
+ * This mapper is intended for internal use within the sensitive words CRUD operations.
+ * It exposes the actual word because these endpoints are internal and not public.
+ * External clients should only receive masked words via the {@code sanitizeMessage} endpoint.
  * </p>
  */
 @Component
@@ -17,7 +19,7 @@ public class SensitiveWordMapper {
     public SensitiveWordResponse toResponse(SensitiveWord word) {
         return SensitiveWordResponse.builder()
                 .id(word.getId())
-                .wordMasked("*".repeat(word.getWord().length()))
+                .word(word.getWord())
                 .build();
     }
 }
