@@ -29,19 +29,11 @@ A robust RESTful microservice built as part of a Flash technical assessment. The
 
 ## 🚀 Getting Started
 
-### Local Build & Run
+This service requires a running SQL Server instance. The recommended approach for both
+local development and production is Docker Compose, which manages the database and
+application containers together.
 
-```bash
-# Clone the repository
-git clone https://github.com/MrJusticeShai/content-sanitizer-api.git
-cd content-sanitizer
-
-# Build the project
-mvn clean package
-
-# Run the Spring Boot app
-java -jar target/content-sanitizer-0.0.1-SNAPSHOT.jar
-```
+---
 
 ### Docker Compose (Recommended)
 
@@ -59,7 +51,8 @@ docker-compose up -d
 
 **3. First run only — create the database:**
 
-Once the `sqlserver` container is healthy, run:
+SQL Server does not create the application database automatically. Once the `sqlserver`
+container is healthy, run:
 ```bash
 docker exec -it sqlserver /opt/mssql-tools18/bin/sqlcmd \
   -S localhost -U sa -P 'your_password' \
@@ -80,8 +73,75 @@ The API is now available at `http://localhost:8080/swagger-ui.html`.
 ```bash
 docker-compose down
 ```
+
 ---
 
+### Local Build & Run (Development)
+
+> **Note:** This approach is for local development only. The Docker Compose approach
+> is recommended for production and for first-time setup.
+
+**Prerequisite:** SQL Server must be running and the `sensitivewords` database must
+exist before starting the app. The easiest way is to start just the database container:
+```bash
+docker-compose up -d sqlserver
+```
+
+Wait for it to become healthy, then create the database if it does not exist yet:
+```bash
+docker exec -it sqlserver /opt/mssql-tools18/bin/sqlcmd \
+  -S localhost -U sa -P 'your_password' \
+  -Q 'CREATE DATABASE sensitivewords' \
+  -C
+```
+
+**Clone and build:**
+```bash
+git clone https://github.com/MrJusticeShai/content-sanitizer-api.git
+cd content-sanitizer-api
+
+mvn clean package -DskipTests
+```
+
+**Run the app:**
+```bash
+java -jar target/content-sanitizer-api-0.0.1-SNAPSHOT.jar
+```
+
+---
+
+### Common Errors
+
+**`Cannot open database "sensitivewords" requested by the login`**
+
+The database has not been created yet. Run the `CREATE DATABASE` command above and
+restart the app.
+
+**`Connection refused` on port 1433**
+
+SQL Server is not running. Start the database container first:
+```bash
+docker-compose up -d sqlserver
+```
+
+**`Connection reset` / SSL certificate error**
+
+The JDBC driver is attempting an encrypted connection and rejecting the self-signed
+certificate. Ensure `encrypt=false` is included in the datasource URL as shown above.
+
+---
+
+### Development vs Production
+
+| | Local Development | Production |
+|---|---|---|
+| Database | SQL Server in Docker on `localhost` | Managed SQL Server (e.g. Azure SQL, AWS RDS) |
+| Credentials | `.env` file | Environment variables injected by the platform (e.g. Azure App Service, Kubernetes secrets) |
+| Database creation | Manual `CREATE DATABASE` via `sqlcmd` | Provisioned by infrastructure or migration tooling (e.g. Flyway) |
+| SSL encryption | `encrypt=false` for self-signed cert | `encrypt=true` with a valid certificate |
+| App startup | `java -jar` or `docker-compose up` | Container orchestration (e.g. Kubernetes, Azure Container Apps) |
+
+---
 ## 💻 API Exploration
 
 ### Swagger UI
@@ -275,3 +335,66 @@ The following checklist outlines production-grade improvements beyond the base i
 - [ ] **Input length guard** — Reject messages exceeding a configurable maximum length (e.g. 10 000 characters) at the DTO validation layer to prevent regex catastrophic backtracking on adversarial input.
 - [ ] **API key / JWT authentication** — Secure the management endpoints (`/api/internal/sensitive-words/**`) behind Spring Security with role-based access (`ROLE_ADMIN`), leaving `/api/sanitize` optionally open for service-to-service calls.
 - [ ] **Integration test coverage** — Add `@SpringBootTest` + Testcontainers (SQL Server image) tests for the full sanitize-and-refresh cycle, ensuring cache consistency is validated against a real database.
+
+### Configuration & Deployment
+
+- [ ] **Spring profile separation** — Introduce `application-dev.yml` and `application-prod.yml`
+  profiles to scope environment-specific configuration. `show-sql: true` and verbose logging
+  would be restricted to the `dev` profile only, ensuring clean, secure defaults in production.
+  The active profile would be injected at runtime via `--spring.profiles.active=prod` or
+  an environment variable, removing the need to change committed configuration between environments.
+- [ ] **Automated database initialisation** — The `sensitivewords` database currently requires
+  manual creation via `sqlcmd` on first run. In production this would be handled by a Flyway
+  migration or an init SQL script mounted into the SQL Server container, making setup fully
+  automated and repeatable with no manual steps.
+- [ ] **Scheduled cache auto-refresh** — Add `@Scheduled(fixedRateString = "${sanitizer.cache.refresh-interval:300000}")`
+  to `refreshCache()` to periodically sync the in-memory cache with the database without
+  manual intervention or a service restart.
+- [ ] **CI/CD pipeline** — Introduce a GitHub Actions pipeline to automate the build, test,
+    and deployment lifecycle. A typical pipeline would consist of three stages:
+- [ ] **Build & Test** — `mvn clean package` + unit tests on every push and pull request,
+  ensuring no broken code reaches the main branch.
+- [ ] **Docker Build & Push** — Build the Docker image and push to a container registry
+  (e.g. Docker Hub, Azure Container Registry) on merge to main.
+- [ ] **Deploy** — Pull the latest image and redeploy the container to the target environment
+  (e.g. Azure Container Apps, AWS ECS, Kubernetes) with zero-downtime rolling updates.
+
+### Infrastructure
+
+The service is fully containerised and designed to run on any container orchestration
+platform. The recommended production stack is:
+
+| Component | Production Choice | Rationale |
+|---|---|---|
+| Container orchestration | Kubernetes or Azure Container Apps | Auto-scaling, rolling updates, health-based restarts |
+| Database | Azure SQL or AWS RDS (SQL Server) | Managed, highly available, automated backups |
+| Container registry | Azure Container Registry or Docker Hub | Stores versioned Docker images built by CI/CD |
+| Secrets management | Azure Key Vault or AWS Secrets Manager | Credentials never stored in code or environment files |
+| Reverse proxy / gateway | Azure API Management or AWS API Gateway | Rate limiting, authentication, request routing |
+
+---
+
+### Deployment Flow
+```
+Developer pushes to main
+        │
+        ▼
+GitHub Actions — Build & Test
+  mvn clean package + unit tests
+        │
+        ▼
+GitHub Actions — Docker Build & Push
+  docker build → push to container registry
+        │
+        ▼
+GitHub Actions — Deploy
+  pull latest image → rolling update
+        │
+        ▼
+Container platform pulls new image
+  zero-downtime rolling deployment
+  health checks verify startup before
+  old containers are terminated
+```
+
+---
