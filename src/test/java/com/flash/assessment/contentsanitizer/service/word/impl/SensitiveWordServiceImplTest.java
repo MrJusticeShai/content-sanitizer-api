@@ -15,10 +15,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -50,12 +52,14 @@ class SensitiveWordServiceImplTest {
         updateRequest = new UpdateSensitiveWordRequest();
         updateRequest.setCurrentWord("PASSWORD");
         updateRequest.setNewWord("PASSPHRASE");
+        ReflectionTestUtils.setField(sensitiveWordService, "bulkMaxSize", 50);
+
     }
 
-    // refreshCache() / getCachedPatterns()
+    // refreshCache() & getCachedPatterns()
 
     @Nested
-    @DisplayName("refreshCache() and getCachedPatterns() Logic")
+    @DisplayName("refreshCache() and getCachedPatterns()")
     class CacheTests {
 
         @Test
@@ -113,7 +117,7 @@ class SensitiveWordServiceImplTest {
     // createWord()
 
     @Nested
-    @DisplayName("createWord() Logic")
+    @DisplayName("createWord()")
     class CreateWordTests {
 
         @Test
@@ -183,10 +187,179 @@ class SensitiveWordServiceImplTest {
         }
     }
 
+    // bulkCreateWords()
+
+    @Nested
+    @DisplayName("bulkCreateWords()")
+    class BulkCreateWordTests {
+
+        @Test
+        @DisplayName("Positive: Should save all words and refresh cache")
+        void bulkCreateWords_ValidRequest_SavesAllAndRefreshesCache() {
+            CreateSensitiveWordRequest req1 = new CreateSensitiveWordRequest();
+            req1.setWord("password");
+            CreateSensitiveWordRequest req2 = new CreateSensitiveWordRequest();
+            req2.setWord("secret");
+
+            when(repository.findAll())
+                    .thenReturn(List.of())
+                    .thenReturn(List.of(
+                            SensitiveWord.builder().word("PASSWORD").build(),
+                            SensitiveWord.builder().word("SECRET").build()
+                    ));
+            when(repository.saveAll(anyList())).thenReturn(List.of(
+                    SensitiveWord.builder().word("PASSWORD").build(),
+                    SensitiveWord.builder().word("SECRET").build()
+            ));
+
+            List<SensitiveWord> result = sensitiveWordService.bulkCreateWords(List.of(req1, req2));
+
+            assertEquals(2, result.size());
+            verify(repository, times(2)).findAll();
+            verify(repository, times(1)).saveAll(anyList());
+            verifyNoMoreInteractions(repository);
+        }
+
+        @Test
+        @DisplayName("Positive: Should skip words that already exist")
+        void bulkCreateWords_SomeExist_SkipsDuplicates() {
+            CreateSensitiveWordRequest req1 = new CreateSensitiveWordRequest();
+            req1.setWord("password");
+            CreateSensitiveWordRequest req2 = new CreateSensitiveWordRequest();
+            req2.setWord("secret");
+
+            when(repository.findAll())
+                    .thenReturn(List.of(                            // call 1 — existence check
+                            SensitiveWord.builder().word("SECRET").build()
+                    ))
+                    .thenReturn(List.of(                            // call 2 — refreshCache()
+                            SensitiveWord.builder().word("SECRET").build(),
+                            SensitiveWord.builder().word("PASSWORD").build()
+                    ));
+            when(repository.saveAll(anyList())).thenReturn(List.of(
+                    SensitiveWord.builder().word("PASSWORD").build()
+            ));
+
+            List<SensitiveWord> result = sensitiveWordService.bulkCreateWords(List.of(req1, req2));
+
+            assertEquals(1, result.size());
+            assertEquals("PASSWORD", result.get(0).getWord());
+            verify(repository, times(2)).findAll();
+            verify(repository, times(1)).saveAll(anyList());
+            verifyNoMoreInteractions(repository);
+        }
+
+        @Test
+        @DisplayName("Positive: Should deduplicate words within the same request")
+        void bulkCreateWords_DuplicatesInRequest_DeduplicatesBeforeSave() {
+            CreateSensitiveWordRequest req1 = new CreateSensitiveWordRequest();
+            req1.setWord("password");
+            CreateSensitiveWordRequest req2 = new CreateSensitiveWordRequest();
+            req2.setWord("PASSWORD");
+
+            when(repository.findAll())
+                    .thenReturn(List.of())                          // call 1 — existence check
+                    .thenReturn(List.of(                            // call 2 — refreshCache()
+                            SensitiveWord.builder().word("PASSWORD").build()
+                    ));
+            when(repository.saveAll(anyList())).thenAnswer(i -> i.getArgument(0));
+
+            List<SensitiveWord> result = sensitiveWordService.bulkCreateWords(List.of(req1, req2));
+
+            assertEquals(1, result.size());
+            verify(repository, times(2)).findAll();
+            verifyNoMoreInteractions(repository);
+        }
+
+        @Test
+        @DisplayName("Positive: Should trim and uppercase words before saving")
+        void bulkCreateWords_TrimsAndUppercases_BeforeSave() {
+            CreateSensitiveWordRequest req = new CreateSensitiveWordRequest();
+            req.setWord("  password  ");
+
+            when(repository.findAll())
+                    .thenReturn(List.of())                          // call 1 — existence check
+                    .thenReturn(List.of(                            // call 2 — refreshCache()
+                            SensitiveWord.builder().word("PASSWORD").build()
+                    ));
+            when(repository.saveAll(anyList())).thenAnswer(invocation -> {
+                List<SensitiveWord> saved = invocation.getArgument(0);
+                assertEquals("PASSWORD", saved.get(0).getWord());
+                return saved;
+            });
+
+            sensitiveWordService.bulkCreateWords(List.of(req));
+
+            verify(repository, times(1)).saveAll(anyList());
+            verify(repository, times(2)).findAll();
+            verifyNoMoreInteractions(repository);
+        }
+
+        @Test
+        @DisplayName("Positive: Should return empty list when all words already exist")
+        void bulkCreateWords_AllExist_ReturnsEmptyList() {
+            CreateSensitiveWordRequest req = new CreateSensitiveWordRequest();
+            req.setWord("password");
+
+            when(repository.findAll())
+                    .thenReturn(List.of(                            // call 1 — existence check
+                            SensitiveWord.builder().word("PASSWORD").build()
+                    ))
+                    .thenReturn(List.of(                            // call 2 — refreshCache()
+                            SensitiveWord.builder().word("PASSWORD").build()
+                    ));
+            when(repository.saveAll(anyList())).thenReturn(List.of());
+
+            List<SensitiveWord> result = sensitiveWordService.bulkCreateWords(List.of(req));
+
+            assertEquals(0, result.size());
+            verify(repository, times(2)).findAll();
+            verify(repository, times(1)).saveAll(anyList());
+            verifyNoMoreInteractions(repository);
+        }
+
+        @Test
+        @DisplayName("Negative: Should throw BadRequestException when request exceeds max batch size")
+        void bulkCreateWords_ExceedsMaxSize_ThrowsBadRequest() {
+            List<CreateSensitiveWordRequest> oversizedRequest = IntStream.range(0, 51)
+                    .mapToObj(i -> {
+                        CreateSensitiveWordRequest req = new CreateSensitiveWordRequest();
+                        req.setWord("word" + i);
+                        return req;
+                    })
+                    .toList();
+
+            assertThrows(BadRequestException.class, () ->
+                    sensitiveWordService.bulkCreateWords(oversizedRequest));
+
+            verifyNoInteractions(repository);
+        }
+
+
+
+        @Test
+        @DisplayName("Negative: Should throw BadRequestException when list is null")
+        void bulkCreateWords_NullList_ThrowsBadRequest() {
+            assertThrows(BadRequestException.class, () ->
+                    sensitiveWordService.bulkCreateWords(null));
+
+            verifyNoInteractions(repository);
+        }
+
+        @Test
+        @DisplayName("Negative: Should throw BadRequestException when list is empty")
+        void bulkCreateWords_EmptyList_ThrowsBadRequest() {
+            assertThrows(BadRequestException.class, () ->
+                    sensitiveWordService.bulkCreateWords(List.of()));
+
+            verifyNoInteractions(repository);
+        }
+    }
+
     // getAllWords()
 
     @Nested
-    @DisplayName("getAllWords() Logic")
+    @DisplayName("getAllWords()")
     class GetAllWordsTests {
 
         @Test
@@ -217,7 +390,7 @@ class SensitiveWordServiceImplTest {
     // updateWord()
 
     @Nested
-    @DisplayName("updateWord() Logic")
+    @DisplayName("updateWord()")
     class UpdateWordTests {
 
         @Test
@@ -289,7 +462,7 @@ class SensitiveWordServiceImplTest {
     // deleteWordByWord()
 
     @Nested
-    @DisplayName("deleteWordByWord() Logic")
+    @DisplayName("deleteWordByWord()")
     class DeleteWordTests {
 
         @Test

@@ -37,7 +37,7 @@ class SanitizationServiceImplTest {
     }
 
     @Nested
-    @DisplayName("sanitizeMessage() Logic")
+    @DisplayName("sanitizeMessage()")
     class SanitizeMessageTests {
 
         @Test

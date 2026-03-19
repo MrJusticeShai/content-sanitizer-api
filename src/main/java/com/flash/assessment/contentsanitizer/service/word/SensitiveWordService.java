@@ -25,6 +25,20 @@ public interface SensitiveWordService {
      */
     SensitiveWord createWord(CreateSensitiveWordRequest createRequest);
 
+
+    /**
+     * Creates multiple sensitive words in a single transaction.
+     *
+     * <p>
+     * Words that already exist are skipped without throwing an exception.
+     * The result contains only the words that were successfully created.
+     * </p>
+     *
+     * @param requests list of DTOs containing the words to create
+     * @return list of successfully created {@link SensitiveWord} entities
+     */
+    List<SensitiveWord> bulkCreateWords(List<CreateSensitiveWordRequest> requests);
+
     /**
      * Retrieves all sensitive words currently stored in the system.
      *
@@ -52,6 +66,7 @@ public interface SensitiveWordService {
      * Safe to call at runtime without restarting the service.
      */
     void refreshCache();
+
 
     public List<Pattern> getCachedPatterns();
 

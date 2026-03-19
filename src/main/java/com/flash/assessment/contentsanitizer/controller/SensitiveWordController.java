@@ -45,6 +45,25 @@ public class SensitiveWordController {
         return ResponseEntity.ok(mapper.toResponse(created));
     }
 
+    // -----------------BULK CREATE -----------------
+    @PostMapping("/bulk")
+    @Operation(
+            summary = "Bulk create sensitive words",
+            description = "Creates multiple sensitive words in a single transaction. Words that already exist are skipped silently."
+    )
+    @ApiResponse(responseCode = "200", description = "Bulk create completed — returns only successfully created words")
+    @ApiResponse(responseCode = "400", description = "Request list is null or empty")
+    public ResponseEntity<List<SensitiveWordResponse>> bulkCreateWords(
+            @RequestBody @Valid List<CreateSensitiveWordRequest> requests) {
+
+        List<SensitiveWord> created = wordService.bulkCreateWords(requests);
+        List<SensitiveWordResponse> responses = created.stream()
+                .map(mapper::toResponse)
+                .toList();
+
+        return ResponseEntity.ok(responses);
+    }
+
     // ----------------- READ ALL -----------------
     @GetMapping
     @Operation(summary = "Get all sensitive words")

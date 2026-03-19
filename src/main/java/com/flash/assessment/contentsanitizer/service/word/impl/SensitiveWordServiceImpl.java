@@ -11,13 +11,16 @@ import com.flash.assessment.contentsanitizer.service.word.SensitiveWordService;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -27,9 +30,10 @@ public class SensitiveWordServiceImpl implements SensitiveWordService {
 
     private final SensitiveWordRepository repository;
     private final AtomicReference<List<Pattern>> cachedPatterns = new AtomicReference<>(List.of());
+    @Value("${sanitizer.bulk.max-size}")
+    private int bulkMaxSize;
 
     @PostConstruct
-    @Override
     public void refreshCache() {
         try {
             List<Pattern> patterns = getAllWords().stream()
@@ -69,6 +73,42 @@ public class SensitiveWordServiceImpl implements SensitiveWordService {
 
         SensitiveWord saved = repository.save(word);
         refreshCache();
+
+        return saved;
+    }
+
+    @Override
+    public List<SensitiveWord> bulkCreateWords(List<CreateSensitiveWordRequest> requests) {
+        if (requests == null || requests.isEmpty()) {
+            throw new BadRequestException("Word list must not be empty");
+        }
+
+        if (requests.size() > bulkMaxSize) {
+            throw new BadRequestException(
+                    "Bulk request exceeds maximum allowed size of " + bulkMaxSize + " words");
+        }
+
+        // DB call 1 — fetch all existing words once, reused for duplicate filtering
+        Set<String> existingWordSet = repository.findAll().stream()
+                .map(w -> w.getWord().toUpperCase())
+                .collect(Collectors.toSet());
+
+        List<SensitiveWord> toSave = requests.stream()
+                .map(r -> r.getWord().trim().toUpperCase())
+                .filter(StringUtils::hasText)
+                .distinct()
+                .filter(word -> !existingWordSet.contains(word))
+                .map(word -> SensitiveWord.builder().word(word).build())
+                .toList();
+
+        // DB call 2 — persist all new words in a single transaction
+        List<SensitiveWord> saved = repository.saveAll(toSave);
+
+        // DB call 3 — refreshCache() owns cache compilation
+        refreshCache();
+
+        log.info("Bulk create — {} word(s) saved, {} skipped.",
+                saved.size(), requests.size() - saved.size());
 
         return saved;
     }

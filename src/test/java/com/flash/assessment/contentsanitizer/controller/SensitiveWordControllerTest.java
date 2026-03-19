@@ -5,6 +5,7 @@ import com.flash.assessment.contentsanitizer.dto.CreateSensitiveWordRequest;
 import com.flash.assessment.contentsanitizer.dto.SensitiveWordResponse;
 import com.flash.assessment.contentsanitizer.dto.UpdateSensitiveWordRequest;
 import com.flash.assessment.contentsanitizer.entity.SensitiveWord;
+import com.flash.assessment.contentsanitizer.exception.BadRequestException;
 import com.flash.assessment.contentsanitizer.exception.ConflictException;
 import com.flash.assessment.contentsanitizer.exception.GlobalExceptionHandler;
 import com.flash.assessment.contentsanitizer.exception.NotFoundException;
@@ -127,6 +128,103 @@ class SensitiveWordControllerTest {
                     .andExpect(jsonPath("$.message").exists());
 
             verify(wordService, times(1)).createWord(any(CreateSensitiveWordRequest.class));
+            verifyNoMoreInteractions(wordService);
+            verifyNoInteractions(mapper);
+        }
+    }
+
+    @Nested
+    @DisplayName("POST /api/internal/sensitive-words/bulk")
+    class BulkCreateWordTests {
+
+        @Test
+        @DisplayName("Should return 200 and list of created words")
+        void bulkCreateWords_ValidRequest_ReturnsOk() throws Exception {
+            CreateSensitiveWordRequest req1 = new CreateSensitiveWordRequest();
+            req1.setWord("password");
+            CreateSensitiveWordRequest req2 = new CreateSensitiveWordRequest();
+            req2.setWord("secret");
+
+            SensitiveWord entity1 = buildEntity("PASSWORD");
+            SensitiveWord entity2 = buildEntity("SECRET");
+            SensitiveWordResponse response1 = buildResponse("PASSWORD");
+            SensitiveWordResponse response2 = buildResponse("SECRET");
+
+            when(wordService.bulkCreateWords(anyList())).thenReturn(List.of(entity1, entity2));
+            when(mapper.toResponse(entity1)).thenReturn(response1);
+            when(mapper.toResponse(entity2)).thenReturn(response2);
+
+            mockMvc.perform(post("/api/internal/sensitive-words/bulk")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(List.of(req1, req2))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.length()").value(2))
+                    .andExpect(jsonPath("$[0].word").value("PASSWORD"))
+                    .andExpect(jsonPath("$[1].word").value("SECRET"));
+
+            verify(wordService, times(1)).bulkCreateWords(anyList());
+            verify(mapper, times(1)).toResponse(entity1);
+            verify(mapper, times(1)).toResponse(entity2);
+            verifyNoMoreInteractions(wordService, mapper);
+        }
+
+        @Test
+        @DisplayName("Should return 200 with only newly created words when some already exist")
+        void bulkCreateWords_SomeExist_ReturnsOnlyCreated() throws Exception {
+            CreateSensitiveWordRequest req1 = new CreateSensitiveWordRequest();
+            req1.setWord("password");
+            CreateSensitiveWordRequest req2 = new CreateSensitiveWordRequest();
+            req2.setWord("secret");
+
+            SensitiveWord entity1 = buildEntity("PASSWORD");
+            SensitiveWordResponse response1 = buildResponse("PASSWORD");
+
+            when(wordService.bulkCreateWords(anyList())).thenReturn(List.of(entity1));
+            when(mapper.toResponse(entity1)).thenReturn(response1);
+
+            mockMvc.perform(post("/api/internal/sensitive-words/bulk")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(List.of(req1, req2))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.length()").value(1))
+                    .andExpect(jsonPath("$[0].word").value("PASSWORD"));
+
+            verify(wordService, times(1)).bulkCreateWords(anyList());
+            verifyNoMoreInteractions(wordService);
+        }
+
+        @Test
+        @DisplayName("Should return 200 with empty list when all words already exist")
+        void bulkCreateWords_AllExist_ReturnsEmptyList() throws Exception {
+            CreateSensitiveWordRequest req1 = new CreateSensitiveWordRequest();
+            req1.setWord("password");
+
+            when(wordService.bulkCreateWords(anyList())).thenReturn(List.of());
+
+            mockMvc.perform(post("/api/internal/sensitive-words/bulk")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(List.of(req1))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.length()").value(0));
+
+            verify(wordService, times(1)).bulkCreateWords(anyList());
+            verifyNoMoreInteractions(wordService);
+            verifyNoInteractions(mapper);
+        }
+
+        @Test
+        @DisplayName("Should return 400 when request list is empty")
+        void bulkCreateWords_EmptyList_ReturnsBadRequest() throws Exception {
+            when(wordService.bulkCreateWords(anyList()))
+                    .thenThrow(new BadRequestException("Word list must not be empty"));
+
+            mockMvc.perform(post("/api/internal/sensitive-words/bulk")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(List.of())))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").exists());
+
+            verify(wordService, times(1)).bulkCreateWords(anyList());
             verifyNoMoreInteractions(wordService);
             verifyNoInteractions(mapper);
         }
