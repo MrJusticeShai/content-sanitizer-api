@@ -24,6 +24,6 @@ import lombok.Data;
 public class SanitizeRequest {
 
     @NotBlank
-    @Schema(description = "The message that needs sanitization", required = true, example = "My password is 12345")
+    @Schema(description = "The message that needs sanitization", required = true, example = "My drop is 12345")
     private String message;
 }
