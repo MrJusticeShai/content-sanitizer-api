@@ -323,7 +323,7 @@ The following checklist outlines production-grade improvements beyond the base i
 ### Database & Persistence
 
 - [x] **Indexed `word` column** — Ensure a unique, case-insensitive index on the `word` column (`CREATE UNIQUE INDEX ... ON sensitive_words (LOWER(word))`), so duplicate checks are handled at the DB level, not just application level.
-- [ ] **Bulk word import endpoint** — Add `POST /api/internal/sensitive-words/bulk` accepting a JSON array of words, processed in a single transaction with `saveAll()`, to avoid N+1 insert overhead.
+- [x] **Bulk word import endpoint** — Add `POST /api/internal/sensitive-words/bulk` accepting a JSON array of words, processed in a single transaction with `saveAll()`, to avoid N+1 insert overhead.
 - [ ] **Soft deletes** — Add an `active` boolean flag instead of hard-deleting rows, allowing audit history and easier rollback via an `/api/internal/sensitive-words/{word}/restore` endpoint.
 
 ### API & Observability
